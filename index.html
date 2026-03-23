@@ -151,13 +151,6 @@
 <div class="section">
   <div class="section-title">参数设置</div>
   <div class="setting-row">
-    <span class="setting-label">光栅条纹数</span>
-    <div class="setting-right">
-      <input type="range" id="stripSlider" min="6" max="100" value="24">
-      <span class="setting-value" id="stripValue">24</span>
-    </div>
-  </div>
-  <div class="setting-row">
     <span class="setting-label">倾斜方向</span>
     <div class="axis-toggle">
       <button class="axis-btn active" data-axis="x" onclick="setAxis('x')">左右</button>
@@ -182,7 +175,7 @@
 
 <script>
 const images = [];
-let stripCount = 24, tiltAxis = 'x', isRunning = false;
+let tiltAxis = 'x', isRunning = false;
 const COLORS = ['#7c6aef','#1d9e75','#d85a30','#d4537e','#378add','#ba7517','#639922','#a32d2d'];
 
 const imgList = document.getElementById('imgList');
@@ -291,8 +284,6 @@ function updateUI() {
   renderAngleBar();
 }
 
-document.getElementById('stripSlider').addEventListener('input', function(){ stripCount=+this.value; document.getElementById('stripValue').textContent=stripCount; });
-
 function setAxis(a) {
   tiltAxis = a;
   document.querySelectorAll('.axis-btn').forEach(b => b.classList.toggle('active', b.dataset.axis===a));
@@ -315,109 +306,92 @@ function setupCanvas() {
 }
 
 /**
- * 核心渲染逻辑 - 完全重写
+ * 渲染逻辑 v5 - 简单直接
  *
- * 原来的问题: 角度落在某张图的范围内时显示完整图片，只在边界处做光栅过渡
- * → 导致"完整图片"和"光栅过渡"之间有突变，视觉上卡一下
+ * 每张图拥有一个角度区间:
+ * - 在区间中心: 干干净净显示这张图, 没有任何特效
+ * - 在两张图交界处: 用 globalAlpha 做快速透明度渐变
+ * - 不用条纹! 条纹在手机 canvas 上只会造成撕裂感
  *
- * 新逻辑: 角度直接映射到一个连续的浮点索引 (0 ~ N-1)
- * - 整数部分 = 左边那张图的编号
- * - 小数部分 = 混合比例 (0=全左, 1=全右)
- * - 永远都在做光栅混合，没有"完整图片"状态
- * - 和真实光栅卡一模一样: 任何角度你都能看到条纹
+ * 就像真实光栅卡: 大部分角度看到清晰图片, 倾斜经过一个角度就"闪"一下换图
  */
+
+// 预计算排序结果, 避免每帧重新排序
+let sortedImgs = [];
+function precompute() {
+  sortedImgs = images.map((m, i) => ({
+    from: m.fromAngle, to: m.toAngle, idx: i,
+    mid: (m.fromAngle + m.toAngle) / 2
+  })).sort((a, b) => a.from - b.from);
+}
+
 function drawFrame(angle) {
   const W = mainCanvas.width, H = mainCanvas.height;
-  if (!images.length || !scaledImages.length) { ctx.clearRect(0,0,W,H); return; }
+  const N = sortedImgs.length;
+  if (!N || !scaledImages.length) { ctx.clearRect(0,0,W,H); return; }
 
-  // 按角度排序
-  const sorted = images.map((m,i) => ({ from: m.fromAngle, to: m.toAngle, idx: i }))
-                       .sort((a,b) => a.from - b.from);
+  // 过渡带宽度(度): 两张图交界处各侧多少度做渐变
+  const FADE = 4;
 
-  // 把角度映射到 0 ~ (N-1) 的连续浮点数
-  // 每张图的中心角度对应一个整数位置
-  const N = sorted.length;
-  const minA = sorted[0].from;
-  const maxA = sorted[N-1].to;
-  const range = maxA - minA;
+  // 找到当前角度落在哪张图的区间, 以及是否在过渡带里
+  let showIdx = -1;
+  let fadeIdx = -1;
+  let fadeAlpha = 0;
 
-  // 归一化到 0~1，然后映射到 0~(N-1)
-  let norm = range > 0 ? (angle - minA) / range : 0.5;
-  norm = Math.max(0, Math.min(1, norm));
-  let pos = norm * (N - 1);
+  for (let i = 0; i < N; i++) {
+    const s = sortedImgs[i];
+    if (angle >= s.from && angle < s.to) {
+      showIdx = s.idx;
 
-  // 取左右两张图和混合比例
-  let idxA = Math.floor(pos);
-  let idxB = idxA + 1;
-  let t = pos - idxA; // 0~1 小数部分
-
-  // 边界处理
-  if (idxA < 0) { idxA = 0; idxB = 0; t = 0; }
-  if (idxB >= N) { idxB = N - 1; idxA = idxB; t = 0; }
-  if (idxA === idxB) t = 0;
-
-  const imgIdxA = sorted[idxA].idx;
-  const imgIdxB = sorted[idxB].idx;
-
-  // 只有一张图或者完全在同一张上 → 还是画条纹（保持视觉一致性）
-  // 但条纹里只有一张图的内容
-  if (t < 0.001 || imgIdxA === imgIdxB) {
-    ctx.drawImage(scaledImages[imgIdxA], 0, 0);
-    // 画淡淡的条纹线保持视觉连续
-    if (stripCount <= 80) {
-      const stripW = W / stripCount;
-      ctx.fillStyle = 'rgba(0,0,0,.04)';
-      for (let i = 1; i < stripCount; i++) {
-        ctx.fillRect(Math.round(i * stripW), 0, 1, H);
+      // 检查是否在右边界过渡带 (当前区间尾部 → 下一区间)
+      if (i < N - 1) {
+        const distToEnd = s.to - angle;
+        if (distToEnd < FADE) {
+          fadeIdx = sortedImgs[i + 1].idx;
+          fadeAlpha = 1 - (distToEnd / FADE);
+          // 加速曲线: 让过渡更"利落"
+          fadeAlpha = fadeAlpha * fadeAlpha;
+        }
       }
-    }
-    hudShowing.textContent = images[imgIdxA].name;
-    hudShowing.style.color = COLORS[imgIdxA % 8];
-    return;
-  }
 
-  // 光栅混合: 先画 A 整张，再用 clip 把 B 的条纹区域裁出来
-  ctx.drawImage(scaledImages[imgIdxA], 0, 0);
-
-  const stripW = W / stripCount;
-  ctx.save();
-  ctx.beginPath();
-  for (let i = 0; i < stripCount; i++) {
-    const x = Math.round(i * stripW);
-    const nx = Math.round((i + 1) * stripW);
-    const fw = nx - x;
-    const bW = Math.round(fw * t);
-    if (bW > 0) {
-      ctx.rect(x + fw - bW, 0, bW, H);
-    }
-  }
-  ctx.clip();
-  ctx.drawImage(scaledImages[imgIdxB], 0, 0);
-  ctx.restore();
-
-  // 条纹分界线
-  if (stripCount <= 80) {
-    ctx.fillStyle = 'rgba(0,0,0,.06)';
-    for (let i = 1; i < stripCount; i++) {
-      ctx.fillRect(Math.round(i * stripW), 0, 1, H);
+      // 检查是否在左边界过渡带 (当前区间开头 ← 上一区间)
+      if (i > 0 && fadeIdx === -1) {
+        const distFromStart = angle - s.from;
+        if (distFromStart < FADE) {
+          fadeIdx = sortedImgs[i - 1].idx;
+          fadeAlpha = 1 - (distFromStart / FADE);
+          fadeAlpha = fadeAlpha * fadeAlpha;
+        }
+      }
+      break;
     }
   }
 
-  // HUD 显示
-  if (t < 0.15) {
-    hudShowing.textContent = images[imgIdxA].name;
-    hudShowing.style.color = COLORS[imgIdxA % 8];
-  } else if (t > 0.85) {
-    hudShowing.textContent = images[imgIdxB].name;
-    hudShowing.style.color = COLORS[imgIdxB % 8];
+  // 角度超出所有区间: 显示最近的那张
+  if (showIdx === -1) {
+    if (angle < sortedImgs[0].from) showIdx = sortedImgs[0].idx;
+    else showIdx = sortedImgs[N - 1].idx;
+  }
+
+  // 画主图 (永远是清晰完整的)
+  ctx.globalAlpha = 1;
+  ctx.drawImage(scaledImages[showIdx], 0, 0);
+
+  // 如果在过渡带, 叠加第二张图的半透明层
+  if (fadeIdx !== -1 && fadeAlpha > 0.01) {
+    ctx.globalAlpha = fadeAlpha;
+    ctx.drawImage(scaledImages[fadeIdx], 0, 0);
+    ctx.globalAlpha = 1;
+
+    hudShowing.textContent = `${images[showIdx].name} → ${images[fadeIdx].name}`;
+    hudShowing.style.color = COLORS[showIdx % 8];
   } else {
-    hudShowing.textContent = `${images[imgIdxA].name} ↔ ${images[imgIdxB].name}`;
-    hudShowing.style.color = COLORS[imgIdxA % 8];
+    hudShowing.textContent = images[showIdx].name;
+    hudShowing.style.color = COLORS[showIdx % 8];
   }
 }
 
 let curAngle = 0, smAngle = 0, af = null;
-let lastTime = 0;
 
 function handleOri(e) {
   if (!isRunning) return;
@@ -441,16 +415,10 @@ function handleOri(e) {
   curAngle = Math.max(-90, Math.min(90, raw));
 }
 
-function loop(now) {
+function loop() {
   if (!isRunning) return;
-
-  // 基于时间的平滑插值，不受帧率影响
-  // 60fps 下 dt≈16ms → factor≈0.18, 流畅且跟手
-  const dt = lastTime ? Math.min(now - lastTime, 50) : 16;
-  lastTime = now;
-  const factor = 1 - Math.pow(0.00001, dt / 1000); // 指数衰减平滑
-
-  smAngle += (curAngle - smAngle) * factor;
+  // 简单的线性插值, 0.3 = 跟手又不抖
+  smAngle += (curAngle - smAngle) * 0.3;
   drawFrame(smAngle);
   hudAngle.textContent = Math.round(smAngle) + '°';
   hudDot.style.left = `calc(${((smAngle+90)/180)*100}% - 4px)`;
@@ -458,11 +426,12 @@ function loop(now) {
 }
 
 async function start() {
+  precompute();
   setupCanvas();
   drawFrame(0);
   canvasView.classList.add('active');
   isRunning = true;
-  curAngle = 0; smAngle = 0; lastTime = 0;
+  curAngle = 0; smAngle = 0;
 
   if (typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function') {
     try { const p = await DeviceOrientationEvent.requestPermission(); if(p==='granted') window.addEventListener('deviceorientation',handleOri); } catch(e){}
