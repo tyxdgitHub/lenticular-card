@@ -151,6 +151,13 @@
 <div class="section">
   <div class="section-title">参数设置</div>
   <div class="setting-row">
+    <span class="setting-label">切换角度范围</span>
+    <div class="setting-right">
+      <input type="range" id="fadeSlider" min="4" max="60" value="30">
+      <span class="setting-value" id="fadeValue">30°</span>
+    </div>
+  </div>
+  <div class="setting-row">
     <span class="setting-label">倾斜方向</span>
     <div class="axis-toggle">
       <button class="axis-btn active" data-axis="x" onclick="setAxis('x')">左右</button>
@@ -175,7 +182,7 @@
 
 <script>
 const images = [];
-let tiltAxis = 'x', isRunning = false;
+let tiltAxis = 'x', isRunning = false, fadeWidth = 30;
 const COLORS = ['#7c6aef','#1d9e75','#d85a30','#d4537e','#378add','#ba7517','#639922','#a32d2d'];
 
 const imgList = document.getElementById('imgList');
@@ -284,6 +291,11 @@ function updateUI() {
   renderAngleBar();
 }
 
+document.getElementById('fadeSlider').addEventListener('input', function(){
+  fadeWidth = +this.value;
+  document.getElementById('fadeValue').textContent = fadeWidth + '°';
+});
+
 function setAxis(a) {
   tiltAxis = a;
   document.querySelectorAll('.axis-btn').forEach(b => b.classList.toggle('active', b.dataset.axis===a));
@@ -306,22 +318,22 @@ function setupCanvas() {
 }
 
 /**
- * 渲染逻辑 v5 - 简单直接
+ * 渲染逻辑 v6
  *
- * 每张图拥有一个角度区间:
- * - 在区间中心: 干干净净显示这张图, 没有任何特效
- * - 在两张图交界处: 用 globalAlpha 做快速透明度渐变
- * - 不用条纹! 条纹在手机 canvas 上只会造成撕裂感
- *
- * 就像真实光栅卡: 大部分角度看到清晰图片, 倾斜经过一个角度就"闪"一下换图
+ * 每两张相邻图片之间有一个"分界角度"(boundary)
+ * 以 boundary 为中心，fadeWidth 范围内做 alpha 渐变
+ * 比如 fadeWidth=30°, boundary=0°:
+ *   -15° 时: 100% 图A
+ *   -7° 时:  75% 图A + 25% 图B
+ *    0° 时:  50% 图A + 50% 图B
+ *   +7° 时:  25% 图A + 75% 图B
+ *   +15° 时: 100% 图B
  */
 
-// 预计算排序结果, 避免每帧重新排序
 let sortedImgs = [];
 function precompute() {
   sortedImgs = images.map((m, i) => ({
-    from: m.fromAngle, to: m.toAngle, idx: i,
-    mid: (m.fromAngle + m.toAngle) / 2
+    from: m.fromAngle, to: m.toAngle, idx: i
   })).sort((a, b) => a.from - b.from);
 }
 
@@ -330,10 +342,9 @@ function drawFrame(angle) {
   const N = sortedImgs.length;
   if (!N || !scaledImages.length) { ctx.clearRect(0,0,W,H); return; }
 
-  // 过渡带宽度(度): 两张图交界处各侧多少度做渐变
-  const FADE = 4;
+  const halfFade = fadeWidth / 2;
 
-  // 找到当前角度落在哪张图的区间, 以及是否在过渡带里
+  // 找当前角度在哪个区间
   let showIdx = -1;
   let fadeIdx = -1;
   let fadeAlpha = 0;
@@ -343,47 +354,51 @@ function drawFrame(angle) {
     if (angle >= s.from && angle < s.to) {
       showIdx = s.idx;
 
-      // 检查是否在右边界过渡带 (当前区间尾部 → 下一区间)
+      // 右边界过渡: 接近下一张图
       if (i < N - 1) {
-        const distToEnd = s.to - angle;
-        if (distToEnd < FADE) {
+        const boundary = s.to; // 分界角度
+        const dist = boundary - angle; // 距离分界线多远
+        if (dist < halfFade) {
           fadeIdx = sortedImgs[i + 1].idx;
-          fadeAlpha = 1 - (distToEnd / FADE);
-          // 加速曲线: 让过渡更"利落"
-          fadeAlpha = fadeAlpha * fadeAlpha;
+          // dist=halfFade → alpha=0, dist=0 → alpha=1
+          fadeAlpha = 1 - (dist / halfFade);
+          // 在分界点(dist=0)时 fadeAlpha=1，但我们要50/50
+          // 所以 fadeAlpha 只走到 0.5，然后另一侧的逻辑补上
+          fadeAlpha = fadeAlpha * 0.5;
         }
       }
 
-      // 检查是否在左边界过渡带 (当前区间开头 ← 上一区间)
+      // 左边界过渡: 刚从上一张图过来
       if (i > 0 && fadeIdx === -1) {
-        const distFromStart = angle - s.from;
-        if (distFromStart < FADE) {
+        const boundary = s.from;
+        const dist = angle - boundary;
+        if (dist < halfFade) {
           fadeIdx = sortedImgs[i - 1].idx;
-          fadeAlpha = 1 - (distFromStart / FADE);
-          fadeAlpha = fadeAlpha * fadeAlpha;
+          fadeAlpha = 1 - (dist / halfFade);
+          fadeAlpha = fadeAlpha * 0.5;
         }
       }
       break;
     }
   }
 
-  // 角度超出所有区间: 显示最近的那张
+  // 超出范围: 显示最近的
   if (showIdx === -1) {
-    if (angle < sortedImgs[0].from) showIdx = sortedImgs[0].idx;
-    else showIdx = sortedImgs[N - 1].idx;
+    showIdx = angle < sortedImgs[0].from ? sortedImgs[0].idx : sortedImgs[N-1].idx;
   }
 
-  // 画主图 (永远是清晰完整的)
+  // 画主图
   ctx.globalAlpha = 1;
   ctx.drawImage(scaledImages[showIdx], 0, 0);
 
-  // 如果在过渡带, 叠加第二张图的半透明层
-  if (fadeIdx !== -1 && fadeAlpha > 0.01) {
+  // 过渡叠加
+  if (fadeIdx !== -1 && fadeAlpha > 0.005) {
     ctx.globalAlpha = fadeAlpha;
     ctx.drawImage(scaledImages[fadeIdx], 0, 0);
     ctx.globalAlpha = 1;
 
-    hudShowing.textContent = `${images[showIdx].name} → ${images[fadeIdx].name}`;
+    const pct = Math.round((1 - fadeAlpha) * 100);
+    hudShowing.textContent = `${images[showIdx].name} ${pct}%`;
     hudShowing.style.color = COLORS[showIdx % 8];
   } else {
     hudShowing.textContent = images[showIdx].name;
