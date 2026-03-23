@@ -99,6 +99,17 @@
     display:flex; align-items:flex-end; justify-content:space-between;
     background:linear-gradient(to top,rgba(0,0,0,.92) 40%,transparent);
   }
+  @media (orientation:landscape) {
+    .canvas-view canvas { max-width:100%; max-height:96dvh; }
+    .canvas-hud {
+      padding:8px 16px 12px; flex-direction:row; align-items:center;
+      background:linear-gradient(to top,rgba(0,0,0,.95) 60%,transparent);
+    }
+    .canvas-hud .hud-bar { max-width:200px; }
+    .hud-angle { font-size:20px; }
+    .hud-showing { font-size:11px; }
+    .back-btn { padding:8px 16px; font-size:12px; }
+  }
   .hud-angle { font-size:26px; font-weight:700; color:var(--accent-glow); font-variant-numeric:tabular-nums; line-height:1; }
   .hud-showing { font-size:12px; color:rgba(255,255,255,.45); margin-top:4px; }
   .hud-bar { width:100%; height:3px; background:rgba(255,255,255,.08); border-radius:2px; margin-top:8px; position:relative; }
@@ -149,8 +160,8 @@
   <div class="setting-row">
     <span class="setting-label">过渡宽度</span>
     <div class="setting-right">
-      <input type="range" id="blendSlider" min="0" max="20" value="5">
-      <span class="setting-value" id="blendValue">5°</span>
+      <input type="range" id="blendSlider" min="0" max="40" value="10">
+      <span class="setting-value" id="blendValue">10°</span>
     </div>
   </div>
   <div class="setting-row">
@@ -178,7 +189,7 @@
 
 <script>
 const images = [];
-let stripCount = 24, blendWidth = 5, tiltAxis = 'x', isRunning = false;
+let stripCount = 24, blendWidth = 10, tiltAxis = 'x', isRunning = false;
 const COLORS = ['#7c6aef','#1d9e75','#d85a30','#d4537e','#378add','#ba7517','#639922','#a32d2d'];
 
 const imgList = document.getElementById('imgList');
@@ -319,18 +330,31 @@ function findImages(angle) {
     const s = sorted[i];
     if (angle >= s.from && angle < s.to) {
       pri = s.idx;
-      if (blendWidth > 0 && i < sorted.length-1) {
+      const halfBlend = blendWidth / 2;
+
+      // 接近右边界 → 向下一张过渡
+      if (halfBlend > 0 && i < sorted.length-1) {
         const d = s.to - angle;
-        if (d <= blendWidth) { sec = sorted[i+1].idx; t = 1 - d/blendWidth; }
+        if (d <= halfBlend) {
+          sec = sorted[i+1].idx;
+          // 用平滑的 smoothstep 曲线代替线性过渡
+          const raw = 1 - d / halfBlend;
+          t = raw * raw * (3 - 2 * raw); // smoothstep
+        }
       }
-      if (blendWidth > 0 && i > 0 && sec===-1) {
+      // 接近左边界 → 向上一张过渡
+      if (halfBlend > 0 && i > 0 && sec === -1) {
         const d = angle - s.from;
-        if (d <= blendWidth) { sec = sorted[i-1].idx; t = 1 - d/blendWidth; }
+        if (d <= halfBlend) {
+          sec = sorted[i-1].idx;
+          const raw = 1 - d / halfBlend;
+          t = raw * raw * (3 - 2 * raw);
+        }
       }
       break;
     }
   }
-  if (pri===-1 && sorted.length) {
+  if (pri === -1 && sorted.length) {
     pri = angle < sorted[0].from ? sorted[0].idx : sorted[sorted.length-1].idx;
   }
   return { pri, sec, t };
@@ -342,26 +366,40 @@ function drawFrame(angle) {
 
   if (pri === -1) { ctx.clearRect(0,0,W,H); return; }
 
-  if (sec === -1 || t < 0.01) {
+  // 无过渡：直接画整张图（最快路径）
+  if (sec === -1 || t < 0.005) {
     ctx.drawImage(scaledImages[pri], 0, 0);
     hudShowing.textContent = images[pri].name;
     hudShowing.style.color = COLORS[pri%8];
     return;
   }
 
-  const stripW = W / stripCount;
-  ctx.clearRect(0,0,W,H);
+  // 过渡中：先画 primary 整张，再用 clip 逐条覆盖 secondary
+  // 比逐条画两张图快很多，因为 drawImage 整张只需要一次
+  ctx.drawImage(scaledImages[pri], 0, 0);
 
-  for (let i=0; i<stripCount; i++) {
-    const x = Math.round(i*stripW);
-    const nx = Math.round((i+1)*stripW);
+  const stripW = W / stripCount;
+  ctx.save();
+  ctx.beginPath();
+  for (let i = 0; i < stripCount; i++) {
+    const x = Math.round(i * stripW);
+    const nx = Math.round((i + 1) * stripW);
     const fw = nx - x;
-    const aW = Math.round(fw * (1-t));
-    const bW = fw - aW;
-    if (aW > 0) ctx.drawImage(scaledImages[pri], x, 0, aW, H, x, 0, aW, H);
-    if (bW > 0) ctx.drawImage(scaledImages[sec], x+aW, 0, bW, H, x+aW, 0, bW, H);
-    ctx.fillStyle = 'rgba(0,0,0,.1)';
-    ctx.fillRect(nx-1, 0, 1, H);
+    const bW = Math.round(fw * t);
+    if (bW > 0) {
+      ctx.rect(x + fw - bW, 0, bW, H);
+    }
+  }
+  ctx.clip();
+  ctx.drawImage(scaledImages[sec], 0, 0);
+  ctx.restore();
+
+  // 条纹分界线
+  if (stripCount <= 60) {
+    ctx.fillStyle = 'rgba(0,0,0,.08)';
+    for (let i = 1; i < stripCount; i++) {
+      ctx.fillRect(Math.round(i * stripW) - 1, 0, 1, H);
+    }
   }
 
   hudShowing.textContent = `${images[pri].name} → ${images[sec].name}`;
@@ -369,16 +407,40 @@ function drawFrame(angle) {
 }
 
 let curAngle = 0, smAngle = 0, af = null;
+let lastTime = 0;
 
 function handleOri(e) {
   if (!isRunning) return;
-  curAngle = tiltAxis==='x' ? (e.gamma||0) : ((e.beta||0)-45);
-  curAngle = Math.max(-90, Math.min(90, curAngle));
+  const screenAngle = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  const isLandscape = (Math.abs(screenAngle) === 90 || Math.abs(screenAngle) === 270);
+
+  let raw;
+  if (tiltAxis === 'x') {
+    if (isLandscape) {
+      raw = screenAngle === 90 ? -(e.beta||0)+45 : (e.beta||0)-45;
+    } else {
+      raw = e.gamma || 0;
+    }
+  } else {
+    if (isLandscape) {
+      raw = e.gamma || 0;
+    } else {
+      raw = (e.beta||0) - 45;
+    }
+  }
+  curAngle = Math.max(-90, Math.min(90, raw));
 }
 
-function loop() {
+function loop(now) {
   if (!isRunning) return;
-  smAngle += (curAngle - smAngle) * 0.25;
+
+  // 基于时间的平滑插值，不受帧率影响
+  // 60fps 下 dt≈16ms → factor≈0.18, 流畅且跟手
+  const dt = lastTime ? Math.min(now - lastTime, 50) : 16;
+  lastTime = now;
+  const factor = 1 - Math.pow(0.00001, dt / 1000); // 指数衰减平滑
+
+  smAngle += (curAngle - smAngle) * factor;
   drawFrame(smAngle);
   hudAngle.textContent = Math.round(smAngle) + '°';
   hudDot.style.left = `calc(${((smAngle+90)/180)*100}% - 4px)`;
@@ -390,7 +452,7 @@ async function start() {
   drawFrame(0);
   canvasView.classList.add('active');
   isRunning = true;
-  curAngle = 0; smAngle = 0;
+  curAngle = 0; smAngle = 0; lastTime = 0;
 
   if (typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function') {
     try { const p = await DeviceOrientationEvent.requestPermission(); if(p==='granted') window.addEventListener('deviceorientation',handleOri); } catch(e){}
@@ -398,9 +460,13 @@ async function start() {
     window.addEventListener('deviceorientation', handleOri);
   }
   if (!('ontouchstart' in window)) {
-    window.addEventListener('mousemove', e => { if(isRunning) curAngle=((e.clientX/window.innerWidth)-.5)*180; });
+    window.addEventListener('mousemove', e => {
+      if (!isRunning) return;
+      // 桌面端横屏时用水平方向，竖屏时也用水平方向（鼠标只有一种）
+      curAngle = ((e.clientX / window.innerWidth) - 0.5) * 180;
+    });
   }
-  loop();
+  requestAnimationFrame(loop);
 }
 
 function stop() {
