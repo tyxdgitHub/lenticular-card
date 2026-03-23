@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>电子光栅卡</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7c6aef">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #14141f;
+    --surface2: #1e1e2e;
+    --accent: #7c6aef;
+    --accent-glow: #9d8fff;
+    --text: #e8e6f0;
+    --text-dim: #8886a0;
+    --border: #2a2a3e;
+    --radius: 16px;
+  }
+
+  body {
+    font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ---- Header ---- */
+  .header {
+    width: 100%;
+    padding: 28px 24px 12px;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-glow), #c8a0ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 3px;
+  }
+  .header p {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    font-weight: 300;
+  }
+
+  /* ---- Upload Area ---- */
+  .upload-section {
+    width: 100%;
+    max-width: 420px;
+    padding: 0 20px;
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .upload-box {
+    flex: 1;
+    aspect-ratio: 1;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .upload-box:active {
+    transform: scale(0.96);
+  }
+  .upload-box.has-image {
+    border-color: var(--accent);
+    border-style: solid;
+  }
+  .upload-box input { display: none; }
+  .upload-box .icon {
+    font-size: 36px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+  }
+  .upload-box .label {
+    font-size: 13px;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+  .upload-box .tag {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    z-index: 2;
+  }
+  .upload-box .preview {
+    position: absolute;
+    inset: 0;
+    object-fit: cover;
+    width: 100%;
+    height: 100%;
+    border-radius: 14px;
+  }
+
+  /* ---- Settings ---- */
+  .settings {
+    width: 100%;
+    max-width: 420px;
+    padding: 20px 20px 8px;
+  }
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-label {
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+  .setting-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .setting-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent-glow);
+    min-width: 32px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 120px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(124,106,239,0.5);
+  }
+
+  /* ---- Axis Toggle ---- */
+  .axis-toggle {
+    display: flex;
+    background: var(--surface);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .axis-btn {
+    padding: 6px 16px;
+    font-size: 13px;
+    font-family: inherit;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .axis-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* ---- Start Button ---- */
+  .start-btn {
+    width: calc(100% - 40px);
+    max-width: 400px;
+    padding: 16px;
+    border: none;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, var(--accent), #9b7aff);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    letter-spacing: 2px;
+    margin-top: 16px;
+  }
+  .start-btn:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+  }
+  .start-btn:not(:disabled):active {
+    transform: scale(0.97);
+    box-shadow: 0 0 40px rgba(124,106,239,0.5);
+  }
+
+  /* ---- Canvas Full Screen View ---- */
+  .canvas-view {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .canvas-view.active { display: flex; }
+
+  .canvas-view canvas {
+    max-width: 100%;
+    max-height: 82dvh;
+    border-radius: 2px;
+  }
+
+  /* ---- HUD Overlay ---- */
+  .canvas-hud {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 16px 20px 24px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    background: linear-gradient(to top, rgba(0,0,0,0.9) 30%, transparent);
+  }
+  .hud-left {}
+  .hud-angle {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent-glow);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .hud-info {
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    margin-top: 4px;
+  }
+  .hud-bar {
+    width: 160px;
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .hud-bar-fill {
+    height: 100%;
+    background: var(--accent-glow);
+    border-radius: 2px;
+    transition: width 0.05s linear;
+  }
+
+  .back-btn {
+    padding: 12px 24px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .back-btn:active {
+    background: rgba(255,255,255,0.15);
+  }
+
+  /* ---- Animations ---- */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .header { animation: fadeIn 0.5s ease both; }
+  .upload-section { animation: fadeIn 0.5s ease 0.05s both; }
+  .settings { animation: fadeIn 0.5s ease 0.1s both; }
+  .start-btn { animation: fadeIn 0.5s ease 0.15s both; }
+</style>
+</head>
+<body>
+
+<!-- ===== Setup Screen ===== -->
+<div class="header">
+  <h1>电子光栅卡</h1>
+  <p>上传两张图片 · 倾斜手机体验光栅切换</p>
+</div>
+
+<div class="upload-section">
+  <div class="upload-box" id="box1" onclick="document.getElementById('file1').click()">
+    <span class="tag">A</span>
+    <input type="file" id="file1" accept="image/*">
+    <span class="icon">🖼️</span>
+    <span class="label">图片 A</span>
+  </div>
+  <div class="upload-box" id="box2" onclick="document.getElementById('file2').click()">
+    <span class="tag">B</span>
+    <input type="file" id="file2" accept="image/*">
+    <span class="icon">🖼️</span>
+    <span class="label">图片 B</span>
+  </div>
+</div>
+
+<div class="settings">
+  <div class="setting-row">
+    <span class="setting-label">光栅条纹数</span>
+    <div class="setting-right">
+      <input type="range" id="stripSlider" min="6" max="100" value="30">
+      <span class="setting-value" id="stripValue">30</span>
+    </div>
+  </div>
+  <div class="setting-row">
+    <span class="setting-label">灵敏度</span>
+    <div class="setting-right">
+      <input type="range" id="sensSlider" min="1" max="10" value="5">
+      <span class="setting-value" id="sensValue">5</span>
+    </div>
+  </div>
+  <div class="setting-row">
+    <span class="setting-label">倾斜方向</span>
+    <div class="axis-toggle">
+      <button class="axis-btn active" data-axis="x" onclick="setAxis('x')">← 左右 →</button>
+      <button class="axis-btn" data-axis="y" onclick="setAxis('y')">↑ 前后 ↓</button>
+    </div>
+  </div>
+</div>
+
+<button class="start-btn" id="startBtn" disabled>请先上传两张图片</button>
+
+<!-- ===== Canvas View ===== -->
+<div class="canvas-view" id="canvasView">
+  <canvas id="mainCanvas"></canvas>
+  <div class="canvas-hud">
+    <div class="hud-left">
+      <div class="hud-angle" id="hudAngle">0°</div>
+      <div class="hud-info" id="hudLabel">左右倾斜手机切换图片</div>
+      <div class="hud-bar">
+        <div class="hud-bar-fill" id="hudBar" style="width:50%"></div>
+      </div>
+    </div>
+    <button class="back-btn" id="backBtn">← 返回</button>
+  </div>
+</div>
+
+<script>
+// ========== State ==========
+let imgA = null, imgB = null;
+let stripCount = 30;
+let sensitivity = 5;
+let tiltAxis = 'x'; // 'x' = gamma (left/right), 'y' = beta (front/back)
+let isRunning = false;
+
+// ========== DOM ==========
+const file1 = document.getElementById('file1');
+const file2 = document.getElementById('file2');
+const box1 = document.getElementById('box1');
+const box2 = document.getElementById('box2');
+const stripSlider = document.getElementById('stripSlider');
+const sensSlider = document.getElementById('sensSlider');
+const startBtn = document.getElementById('startBtn');
+const canvasView = document.getElementById('canvasView');
+const mainCanvas = document.getElementById('mainCanvas');
+const ctx = mainCanvas.getContext('2d');
+const hudAngle = document.getElementById('hudAngle');
+const hudLabel = document.getElementById('hudLabel');
+const hudBar = document.getElementById('hudBar');
+const backBtn = document.getElementById('backBtn');
+
+// ========== Image Upload ==========
+function loadFile(file, callback) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => callback(img);
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function showPreview(box, img) {
+  const old = box.querySelector('.preview');
+  if (old) old.remove();
+  const el = document.createElement('img');
+  el.className = 'preview';
+  el.src = img.src;
+  box.appendChild(el);
+  box.classList.add('has-image');
+  box.querySelector('.icon').style.display = 'none';
+  box.querySelector('.label').style.display = 'none';
+}
+
+function checkReady() {
+  if (imgA && imgB) {
+    startBtn.disabled = false;
+    startBtn.textContent = '开始体验 ✨';
+  }
+}
+
+file1.addEventListener('change', (e) => {
+  if (e.target.files[0]) {
+    loadFile(e.target.files[0], (img) => {
+      imgA = img;
+      showPreview(box1, img);
+      checkReady();
+    });
+  }
+});
+file2.addEventListener('change', (e) => {
+  if (e.target.files[0]) {
+    loadFile(e.target.files[0], (img) => {
+      imgB = img;
+      showPreview(box2, img);
+      checkReady();
+    });
+  }
+});
+
+// ========== Settings ==========
+stripSlider.addEventListener('input', () => {
+  stripCount = parseInt(stripSlider.value);
+  document.getElementById('stripValue').textContent = stripCount;
+});
+sensSlider.addEventListener('input', () => {
+  sensitivity = parseInt(sensSlider.value);
+  document.getElementById('sensValue').textContent = sensitivity;
+});
+
+function setAxis(axis) {
+  tiltAxis = axis;
+  document.querySelectorAll('.axis-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.axis === axis);
+  });
+  hudLabel.textContent = axis === 'x' ? '左右倾斜手机切换图片' : '前后倾斜手机切换图片';
+}
+
+// ========== Canvas Rendering ==========
+function setupCanvas() {
+  const w = Math.max(imgA.naturalWidth, imgB.naturalWidth);
+  const h = Math.max(imgA.naturalHeight, imgB.naturalHeight);
+  const maxDim = 1080;
+  const scale = Math.min(1, maxDim / Math.max(w, h));
+  mainCanvas.width = Math.round(w * scale);
+  mainCanvas.height = Math.round(h * scale);
+}
+
+// Offscreen canvases for pre-scaling images (performance)
+let scaledA = null, scaledB = null;
+
+function prepareScaledImages() {
+  const W = mainCanvas.width, H = mainCanvas.height;
+
+  scaledA = document.createElement('canvas');
+  scaledA.width = W; scaledA.height = H;
+  scaledA.getContext('2d').drawImage(imgA, 0, 0, W, H);
+
+  scaledB = document.createElement('canvas');
+  scaledB.width = W; scaledB.height = H;
+  scaledB.getContext('2d').drawImage(imgB, 0, 0, W, H);
+}
+
+/**
+ * 绘制光栅帧
+ * @param {number} t - 混合因子 0..1 (0 = 全A, 1 = 全B)
+ */
+function drawFrame(t) {
+  const W = mainCanvas.width;
+  const H = mainCanvas.height;
+  const stripW = W / stripCount;
+
+  t = Math.max(0, Math.min(1, t));
+
+  ctx.clearRect(0, 0, W, H);
+
+  // 光栅效果：每个条纹根据 phase + t 决定显示哪张图
+  for (let i = 0; i < stripCount; i++) {
+    const x = Math.round(i * stripW);
+    const nextX = Math.round((i + 1) * stripW);
+    const w = nextX - x;
+
+    // 使用正弦函数让条纹之间的切换更平滑，模拟真实光栅
+    const phase = i / stripCount;
+    const wave = Math.sin((phase + t) * Math.PI);
+    const showB = wave > 0.5;
+
+    const src = showB ? scaledB : scaledA;
+
+    ctx.drawImage(src, x, 0, w, H, x, 0, w, H);
+
+    // 条纹边界的微妙阴影，模拟光栅的物理凹槽
+    const edgeDark = 0.03 + 0.12 * (1 - Math.abs(wave - 0.5) * 2);
+    ctx.fillStyle = `rgba(0,0,0,${edgeDark})`;
+    ctx.fillRect(x, 0, 1, H);
+  }
+}
+
+// ========== Sensor Handling ==========
+let currentT = 0.5;
+let smoothT = 0.5;
+let animFrame = null;
+
+function handleOrientation(e) {
+  if (!isRunning) return;
+
+  let angle;
+  if (tiltAxis === 'x') {
+    angle = e.gamma || 0; // -90..90 left/right
+  } else {
+    angle = (e.beta || 0) - 45; // recentered: holding phone ~45° is "neutral"
+  }
+
+  const range = 90 / sensitivity;
+  currentT = Math.max(0, Math.min(1, (angle + range) / (2 * range)));
+
+  hudAngle.textContent = `${Math.round(angle)}°`;
+  hudBar.style.width = `${currentT * 100}%`;
+}
+
+function renderLoop() {
+  if (!isRunning) return;
+
+  // 平滑插值，避免抖动
+  smoothT += (currentT - smoothT) * 0.25;
+  drawFrame(smoothT);
+
+  animFrame = requestAnimationFrame(renderLoop);
+}
+
+// ========== Start / Stop ==========
+function startExperience() {
+  setupCanvas();
+  prepareScaledImages();
+  currentT = 0.5;
+  smoothT = 0.5;
+  drawFrame(0.5);
+  canvasView.classList.add('active');
+  isRunning = true;
+
+  window.addEventListener('deviceorientation', handleOrientation);
+  renderLoop();
+}
+
+function stopExperience() {
+  isRunning = false;
+  canvasView.classList.remove('active');
+  window.removeEventListener('deviceorientation', handleOrientation);
+  if (animFrame) cancelAnimationFrame(animFrame);
+}
+
+startBtn.addEventListener('click', startExperience);
+backBtn.addEventListener('click', stopExperience);
+
+// Register PWA Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
