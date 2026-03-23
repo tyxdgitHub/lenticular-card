@@ -158,13 +158,6 @@
     </div>
   </div>
   <div class="setting-row">
-    <span class="setting-label">过渡宽度</span>
-    <div class="setting-right">
-      <input type="range" id="blendSlider" min="0" max="40" value="10">
-      <span class="setting-value" id="blendValue">10°</span>
-    </div>
-  </div>
-  <div class="setting-row">
     <span class="setting-label">倾斜方向</span>
     <div class="axis-toggle">
       <button class="axis-btn active" data-axis="x" onclick="setAxis('x')">左右</button>
@@ -189,7 +182,7 @@
 
 <script>
 const images = [];
-let stripCount = 24, blendWidth = 10, tiltAxis = 'x', isRunning = false;
+let stripCount = 24, tiltAxis = 'x', isRunning = false;
 const COLORS = ['#7c6aef','#1d9e75','#d85a30','#d4537e','#378add','#ba7517','#639922','#a32d2d'];
 
 const imgList = document.getElementById('imgList');
@@ -299,7 +292,6 @@ function updateUI() {
 }
 
 document.getElementById('stripSlider').addEventListener('input', function(){ stripCount=+this.value; document.getElementById('stripValue').textContent=stripCount; });
-document.getElementById('blendSlider').addEventListener('input', function(){ blendWidth=+this.value; document.getElementById('blendValue').textContent=blendWidth+'°'; });
 
 function setAxis(a) {
   tiltAxis = a;
@@ -322,61 +314,70 @@ function setupCanvas() {
   });
 }
 
-function findImages(angle) {
-  const sorted = images.map((m,i)=>({from:m.fromAngle, to:m.toAngle, idx:i})).sort((a,b)=>a.from-b.from);
-  let pri = -1, sec = -1, t = 0;
-
-  for (let i=0; i<sorted.length; i++) {
-    const s = sorted[i];
-    if (angle >= s.from && angle < s.to) {
-      pri = s.idx;
-      const halfBlend = blendWidth / 2;
-
-      // 接近右边界 → 向下一张过渡
-      if (halfBlend > 0 && i < sorted.length-1) {
-        const d = s.to - angle;
-        if (d <= halfBlend) {
-          sec = sorted[i+1].idx;
-          // 用平滑的 smoothstep 曲线代替线性过渡
-          const raw = 1 - d / halfBlend;
-          t = raw * raw * (3 - 2 * raw); // smoothstep
-        }
-      }
-      // 接近左边界 → 向上一张过渡
-      if (halfBlend > 0 && i > 0 && sec === -1) {
-        const d = angle - s.from;
-        if (d <= halfBlend) {
-          sec = sorted[i-1].idx;
-          const raw = 1 - d / halfBlend;
-          t = raw * raw * (3 - 2 * raw);
-        }
-      }
-      break;
-    }
-  }
-  if (pri === -1 && sorted.length) {
-    pri = angle < sorted[0].from ? sorted[0].idx : sorted[sorted.length-1].idx;
-  }
-  return { pri, sec, t };
-}
-
+/**
+ * 核心渲染逻辑 - 完全重写
+ *
+ * 原来的问题: 角度落在某张图的范围内时显示完整图片，只在边界处做光栅过渡
+ * → 导致"完整图片"和"光栅过渡"之间有突变，视觉上卡一下
+ *
+ * 新逻辑: 角度直接映射到一个连续的浮点索引 (0 ~ N-1)
+ * - 整数部分 = 左边那张图的编号
+ * - 小数部分 = 混合比例 (0=全左, 1=全右)
+ * - 永远都在做光栅混合，没有"完整图片"状态
+ * - 和真实光栅卡一模一样: 任何角度你都能看到条纹
+ */
 function drawFrame(angle) {
   const W = mainCanvas.width, H = mainCanvas.height;
-  const { pri, sec, t } = findImages(angle);
+  if (!images.length || !scaledImages.length) { ctx.clearRect(0,0,W,H); return; }
 
-  if (pri === -1) { ctx.clearRect(0,0,W,H); return; }
+  // 按角度排序
+  const sorted = images.map((m,i) => ({ from: m.fromAngle, to: m.toAngle, idx: i }))
+                       .sort((a,b) => a.from - b.from);
 
-  // 无过渡：直接画整张图（最快路径）
-  if (sec === -1 || t < 0.005) {
-    ctx.drawImage(scaledImages[pri], 0, 0);
-    hudShowing.textContent = images[pri].name;
-    hudShowing.style.color = COLORS[pri%8];
+  // 把角度映射到 0 ~ (N-1) 的连续浮点数
+  // 每张图的中心角度对应一个整数位置
+  const N = sorted.length;
+  const minA = sorted[0].from;
+  const maxA = sorted[N-1].to;
+  const range = maxA - minA;
+
+  // 归一化到 0~1，然后映射到 0~(N-1)
+  let norm = range > 0 ? (angle - minA) / range : 0.5;
+  norm = Math.max(0, Math.min(1, norm));
+  let pos = norm * (N - 1);
+
+  // 取左右两张图和混合比例
+  let idxA = Math.floor(pos);
+  let idxB = idxA + 1;
+  let t = pos - idxA; // 0~1 小数部分
+
+  // 边界处理
+  if (idxA < 0) { idxA = 0; idxB = 0; t = 0; }
+  if (idxB >= N) { idxB = N - 1; idxA = idxB; t = 0; }
+  if (idxA === idxB) t = 0;
+
+  const imgIdxA = sorted[idxA].idx;
+  const imgIdxB = sorted[idxB].idx;
+
+  // 只有一张图或者完全在同一张上 → 还是画条纹（保持视觉一致性）
+  // 但条纹里只有一张图的内容
+  if (t < 0.001 || imgIdxA === imgIdxB) {
+    ctx.drawImage(scaledImages[imgIdxA], 0, 0);
+    // 画淡淡的条纹线保持视觉连续
+    if (stripCount <= 80) {
+      const stripW = W / stripCount;
+      ctx.fillStyle = 'rgba(0,0,0,.04)';
+      for (let i = 1; i < stripCount; i++) {
+        ctx.fillRect(Math.round(i * stripW), 0, 1, H);
+      }
+    }
+    hudShowing.textContent = images[imgIdxA].name;
+    hudShowing.style.color = COLORS[imgIdxA % 8];
     return;
   }
 
-  // 过渡中：先画 primary 整张，再用 clip 逐条覆盖 secondary
-  // 比逐条画两张图快很多，因为 drawImage 整张只需要一次
-  ctx.drawImage(scaledImages[pri], 0, 0);
+  // 光栅混合: 先画 A 整张，再用 clip 把 B 的条纹区域裁出来
+  ctx.drawImage(scaledImages[imgIdxA], 0, 0);
 
   const stripW = W / stripCount;
   ctx.save();
@@ -391,19 +392,28 @@ function drawFrame(angle) {
     }
   }
   ctx.clip();
-  ctx.drawImage(scaledImages[sec], 0, 0);
+  ctx.drawImage(scaledImages[imgIdxB], 0, 0);
   ctx.restore();
 
   // 条纹分界线
-  if (stripCount <= 60) {
-    ctx.fillStyle = 'rgba(0,0,0,.08)';
+  if (stripCount <= 80) {
+    ctx.fillStyle = 'rgba(0,0,0,.06)';
     for (let i = 1; i < stripCount; i++) {
-      ctx.fillRect(Math.round(i * stripW) - 1, 0, 1, H);
+      ctx.fillRect(Math.round(i * stripW), 0, 1, H);
     }
   }
 
-  hudShowing.textContent = `${images[pri].name} → ${images[sec].name}`;
-  hudShowing.style.color = COLORS[pri%8];
+  // HUD 显示
+  if (t < 0.15) {
+    hudShowing.textContent = images[imgIdxA].name;
+    hudShowing.style.color = COLORS[imgIdxA % 8];
+  } else if (t > 0.85) {
+    hudShowing.textContent = images[imgIdxB].name;
+    hudShowing.style.color = COLORS[imgIdxB % 8];
+  } else {
+    hudShowing.textContent = `${images[imgIdxA].name} ↔ ${images[imgIdxB].name}`;
+    hudShowing.style.color = COLORS[imgIdxA % 8];
+  }
 }
 
 let curAngle = 0, smAngle = 0, af = null;
