@@ -10,590 +10,410 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --bg: #0a0a0f;
-    --surface: #14141f;
-    --surface2: #1e1e2e;
-    --accent: #7c6aef;
-    --accent-glow: #9d8fff;
-    --text: #e8e6f0;
-    --text-dim: #8886a0;
-    --border: #2a2a3e;
-    --radius: 16px;
+    --bg: #0a0a0f; --surface: #14141f; --surface2: #1e1e2e;
+    --accent: #7c6aef; --accent-glow: #9d8fff;
+    --text: #e8e6f0; --text-dim: #8886a0;
+    --border: #2a2a3e; --radius: 14px; --danger: #e24b4a;
   }
-
   body {
-    font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    overflow-x: hidden;
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
+    font-family: 'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100dvh; display: flex; flex-direction: column; align-items: center;
+    overflow-x: hidden; -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent; padding-bottom: 40px;
   }
-
-  /* ---- Header ---- */
-  .header {
-    width: 100%;
-    padding: 28px 24px 12px;
-    text-align: center;
-  }
+  .header { width:100%; padding:24px 20px 8px; text-align:center; }
   .header h1 {
-    font-size: 24px;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--accent-glow), #c8a0ff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    letter-spacing: 3px;
+    font-size:22px; font-weight:700; letter-spacing:2px;
+    background:linear-gradient(135deg,var(--accent-glow),#c8a0ff);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
   }
-  .header p {
-    font-size: 13px;
-    color: var(--text-dim);
-    margin-top: 6px;
-    font-weight: 300;
+  .header p { font-size:12px; color:var(--text-dim); margin-top:4px; }
+  .section { width:100%; max-width:440px; padding:0 16px; }
+  .section-title { font-size:13px; color:var(--text-dim); margin:16px 0 8px; padding-left:4px; }
+  .img-list { display:flex; flex-direction:column; gap:8px; }
+  .img-item {
+    display:flex; align-items:center; gap:10px;
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); padding:10px 12px; animation:fadeIn .3s ease;
   }
-
-  /* ---- Upload Area ---- */
-  .upload-section {
-    width: 100%;
-    max-width: 420px;
-    padding: 0 20px;
-    display: flex;
-    gap: 12px;
-    margin-top: 20px;
+  .img-thumb { width:50px; height:50px; border-radius:10px; object-fit:cover; flex-shrink:0; background:var(--surface2); }
+  .img-info { flex:1; min-width:0; }
+  .img-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:5px; }
+  .angle-row { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text-dim); }
+  .angle-input {
+    width:50px; padding:4px 5px; border:1px solid var(--border); border-radius:8px;
+    background:var(--surface2); color:var(--text); font-size:13px; font-family:inherit;
+    text-align:center; outline:none;
   }
-
-  .upload-box {
-    flex: 1;
-    aspect-ratio: 1;
-    border: 2px dashed var(--border);
-    border-radius: var(--radius);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-    background: var(--surface);
+  .angle-input:focus { border-color:var(--accent); }
+  .img-remove {
+    width:30px; height:30px; border:none; border-radius:8px;
+    background:rgba(226,75,74,.12); color:var(--danger); font-size:15px;
+    cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center;
   }
-  .upload-box:active {
-    transform: scale(0.96);
+  .img-remove:active { background:rgba(226,75,74,.25); }
+  .add-btn {
+    width:100%; padding:14px; border:2px dashed var(--border); border-radius:var(--radius);
+    background:transparent; color:var(--text-dim); font-size:14px; font-family:inherit;
+    cursor:pointer; margin-top:8px;
   }
-  .upload-box.has-image {
-    border-color: var(--accent);
-    border-style: solid;
+  .add-btn:active { border-color:var(--accent); color:var(--accent-glow); }
+  .setting-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+  .setting-row:last-child { border-bottom:none; }
+  .setting-label { font-size:13px; color:var(--text-dim); }
+  .setting-right { display:flex; align-items:center; gap:8px; }
+  .setting-value { font-size:14px; font-weight:700; color:var(--accent-glow); min-width:28px; text-align:right; font-variant-numeric:tabular-nums; }
+  input[type=range] { -webkit-appearance:none; appearance:none; width:110px; height:4px; border-radius:2px; background:var(--border); outline:none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:20px; height:20px; border-radius:50%; background:var(--accent); cursor:pointer; }
+  .axis-toggle { display:flex; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+  .axis-btn { padding:5px 14px; font-size:12px; font-family:inherit; border:none; background:transparent; color:var(--text-dim); cursor:pointer; transition:all .2s; }
+  .axis-btn.active { background:var(--accent); color:#fff; }
+  .angle-preview { margin-top:12px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; }
+  .angle-bar-label { font-size:11px; color:var(--text-dim); margin-bottom:8px; }
+  .angle-bar { width:100%; height:26px; border-radius:8px; overflow:hidden; display:flex; }
+  .angle-segment {
+    height:100%; display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:600; color:rgba(255,255,255,.85); min-width:2px; transition:flex .3s;
   }
-  .upload-box input { display: none; }
-  .upload-box .icon {
-    font-size: 36px;
-    margin-bottom: 8px;
-    opacity: 0.5;
+  .angle-bar-ticks { display:flex; justify-content:space-between; margin-top:4px; font-size:10px; color:var(--text-dim); }
+  .auto-btn {
+    padding:6px 14px; border:1px solid var(--border); border-radius:8px;
+    background:var(--surface2); color:var(--accent-glow); font-size:12px; font-family:inherit; cursor:pointer; margin-top:8px;
   }
-  .upload-box .label {
-    font-size: 13px;
-    color: var(--text-dim);
-    font-weight: 400;
-  }
-  .upload-box .tag {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    background: var(--accent);
-    color: #fff;
-    font-size: 11px;
-    padding: 2px 10px;
-    border-radius: 6px;
-    font-weight: 700;
-    z-index: 2;
-  }
-  .upload-box .preview {
-    position: absolute;
-    inset: 0;
-    object-fit: cover;
-    width: 100%;
-    height: 100%;
-    border-radius: 14px;
-  }
-
-  /* ---- Settings ---- */
-  .settings {
-    width: 100%;
-    max-width: 420px;
-    padding: 20px 20px 8px;
-  }
-  .setting-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-  }
-  .setting-row:last-child { border-bottom: none; }
-  .setting-label {
-    font-size: 14px;
-    color: var(--text-dim);
-  }
-  .setting-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .setting-value {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--accent-glow);
-    min-width: 32px;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-  }
-
-  input[type=range] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 120px;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--border);
-    outline: none;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
-    box-shadow: 0 0 12px rgba(124,106,239,0.5);
-  }
-
-  /* ---- Axis Toggle ---- */
-  .axis-toggle {
-    display: flex;
-    background: var(--surface);
-    border-radius: 12px;
-    overflow: hidden;
-    border: 1px solid var(--border);
-  }
-  .axis-btn {
-    padding: 6px 16px;
-    font-size: 13px;
-    font-family: inherit;
-    border: none;
-    background: transparent;
-    color: var(--text-dim);
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .axis-btn.active {
-    background: var(--accent);
-    color: #fff;
-  }
-
-  /* ---- Start Button ---- */
+  .auto-btn:active { background:var(--surface); }
   .start-btn {
-    width: calc(100% - 40px);
-    max-width: 400px;
-    padding: 16px;
-    border: none;
-    border-radius: var(--radius);
-    background: linear-gradient(135deg, var(--accent), #9b7aff);
-    color: #fff;
-    font-size: 16px;
-    font-weight: 700;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    letter-spacing: 2px;
-    margin-top: 16px;
+    width:calc(100% - 32px); max-width:420px; padding:15px; border:none;
+    border-radius:var(--radius); background:linear-gradient(135deg,var(--accent),#9b7aff);
+    color:#fff; font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;
+    letter-spacing:1px; margin-top:20px;
   }
-  .start-btn:disabled {
-    opacity: 0.25;
-    cursor: not-allowed;
-  }
-  .start-btn:not(:disabled):active {
-    transform: scale(0.97);
-    box-shadow: 0 0 40px rgba(124,106,239,0.5);
-  }
-
-  /* ---- Canvas Full Screen View ---- */
-  .canvas-view {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: #000;
-    z-index: 100;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
-  .canvas-view.active { display: flex; }
-
-  .canvas-view canvas {
-    max-width: 100%;
-    max-height: 82dvh;
-    border-radius: 2px;
-  }
-
-  /* ---- HUD Overlay ---- */
+  .start-btn:disabled { opacity:.25; cursor:not-allowed; }
+  .start-btn:not(:disabled):active { transform:scale(.97); }
+  .canvas-view { display:none; position:fixed; inset:0; background:#000; z-index:100; flex-direction:column; align-items:center; justify-content:center; }
+  .canvas-view.active { display:flex; }
+  .canvas-view canvas { max-width:100%; max-height:80dvh; }
   .canvas-hud {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 16px 20px 24px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    background: linear-gradient(to top, rgba(0,0,0,0.9) 30%, transparent);
+    position:fixed; bottom:0; left:0; right:0; padding:14px 16px 24px;
+    display:flex; align-items:flex-end; justify-content:space-between;
+    background:linear-gradient(to top,rgba(0,0,0,.92) 40%,transparent);
   }
-  .hud-left {}
-  .hud-angle {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--accent-glow);
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-  }
-  .hud-info {
-    font-size: 12px;
-    color: rgba(255,255,255,0.4);
-    margin-top: 4px;
-  }
-  .hud-bar {
-    width: 160px;
-    height: 4px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 2px;
-    margin-top: 8px;
-    overflow: hidden;
-  }
-  .hud-bar-fill {
-    height: 100%;
-    background: var(--accent-glow);
-    border-radius: 2px;
-    transition: width 0.05s linear;
-  }
-
+  .hud-angle { font-size:26px; font-weight:700; color:var(--accent-glow); font-variant-numeric:tabular-nums; line-height:1; }
+  .hud-showing { font-size:12px; color:rgba(255,255,255,.45); margin-top:4px; }
+  .hud-bar { width:100%; height:3px; background:rgba(255,255,255,.08); border-radius:2px; margin-top:8px; position:relative; }
+  .hud-bar-dot { width:8px; height:8px; border-radius:50%; background:var(--accent-glow); position:absolute; top:-2.5px; transition:left .05s linear; }
   .back-btn {
-    padding: 12px 24px;
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 14px;
-    background: rgba(255,255,255,0.06);
-    color: #fff;
-    font-size: 14px;
-    font-family: inherit;
-    font-weight: 500;
-    cursor: pointer;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    padding:10px 20px; border:1px solid rgba(255,255,255,.15); border-radius:12px;
+    background:rgba(255,255,255,.06); color:#fff; font-size:13px; font-family:inherit; cursor:pointer;
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
   }
-  .back-btn:active {
-    background: rgba(255,255,255,0.15);
-  }
-
-  /* ---- Animations ---- */
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .header { animation: fadeIn 0.5s ease both; }
-  .upload-section { animation: fadeIn 0.5s ease 0.05s both; }
-  .settings { animation: fadeIn 0.5s ease 0.1s both; }
-  .start-btn { animation: fadeIn 0.5s ease 0.15s both; }
+  .seg-0{background:#7c6aef} .seg-1{background:#1d9e75} .seg-2{background:#d85a30} .seg-3{background:#d4537e}
+  .seg-4{background:#378add} .seg-5{background:#ba7517} .seg-6{background:#639922} .seg-7{background:#a32d2d}
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .hidden-input { display:none; }
 </style>
 </head>
 <body>
 
-<!-- ===== Setup Screen ===== -->
 <div class="header">
   <h1>电子光栅卡</h1>
-  <p>上传两张图片 · 倾斜手机体验光栅切换</p>
+  <p>多图上传 · 自定义角度 · 倾斜手机体验</p>
 </div>
 
-<div class="upload-section">
-  <div class="upload-box" id="box1" onclick="document.getElementById('file1').click()">
-    <span class="tag">A</span>
-    <input type="file" id="file1" accept="image/*">
-    <span class="icon">🖼️</span>
-    <span class="label">图片 A</span>
-  </div>
-  <div class="upload-box" id="box2" onclick="document.getElementById('file2').click()">
-    <span class="tag">B</span>
-    <input type="file" id="file2" accept="image/*">
-    <span class="icon">🖼️</span>
-    <span class="label">图片 B</span>
+<div class="section">
+  <div class="section-title">图片列表 (至少2张)</div>
+  <div class="img-list" id="imgList"></div>
+  <button class="add-btn" id="addBtn">+ 添加图片</button>
+  <input type="file" accept="image/*" class="hidden-input" id="fileInput">
+</div>
+
+<div class="section">
+  <div class="angle-preview" id="anglePreview" style="display:none">
+    <div class="angle-bar-label">角度分布预览</div>
+    <div class="angle-bar" id="angleBar"></div>
+    <div class="angle-bar-ticks"><span>-90°</span><span>-45°</span><span>0°</span><span>45°</span><span>90°</span></div>
+    <div style="text-align:center"><button class="auto-btn" onclick="autoDistribute()">自动均分角度</button></div>
   </div>
 </div>
 
-<div class="settings">
+<div class="section">
+  <div class="section-title">参数设置</div>
   <div class="setting-row">
     <span class="setting-label">光栅条纹数</span>
     <div class="setting-right">
-      <input type="range" id="stripSlider" min="6" max="100" value="30">
-      <span class="setting-value" id="stripValue">30</span>
+      <input type="range" id="stripSlider" min="6" max="100" value="24">
+      <span class="setting-value" id="stripValue">24</span>
     </div>
   </div>
   <div class="setting-row">
-    <span class="setting-label">灵敏度</span>
+    <span class="setting-label">过渡宽度</span>
     <div class="setting-right">
-      <input type="range" id="sensSlider" min="1" max="10" value="5">
-      <span class="setting-value" id="sensValue">5</span>
+      <input type="range" id="blendSlider" min="0" max="20" value="5">
+      <span class="setting-value" id="blendValue">5°</span>
     </div>
   </div>
   <div class="setting-row">
     <span class="setting-label">倾斜方向</span>
     <div class="axis-toggle">
-      <button class="axis-btn active" data-axis="x" onclick="setAxis('x')">← 左右 →</button>
-      <button class="axis-btn" data-axis="y" onclick="setAxis('y')">↑ 前后 ↓</button>
+      <button class="axis-btn active" data-axis="x" onclick="setAxis('x')">左右</button>
+      <button class="axis-btn" data-axis="y" onclick="setAxis('y')">前后</button>
     </div>
   </div>
 </div>
 
-<button class="start-btn" id="startBtn" disabled>请先上传两张图片</button>
+<button class="start-btn" id="startBtn" disabled>请至少上传2张图片</button>
 
-<!-- ===== Canvas View ===== -->
 <div class="canvas-view" id="canvasView">
   <canvas id="mainCanvas"></canvas>
   <div class="canvas-hud">
-    <div class="hud-left">
+    <div>
       <div class="hud-angle" id="hudAngle">0°</div>
-      <div class="hud-info" id="hudLabel">左右倾斜手机切换图片</div>
-      <div class="hud-bar">
-        <div class="hud-bar-fill" id="hudBar" style="width:50%"></div>
-      </div>
+      <div class="hud-showing" id="hudShowing">--</div>
+      <div class="hud-bar"><div class="hud-bar-dot" id="hudDot" style="left:50%"></div></div>
     </div>
     <button class="back-btn" id="backBtn">← 返回</button>
   </div>
 </div>
 
 <script>
-// ========== State ==========
-let imgA = null, imgB = null;
-let stripCount = 30;
-let sensitivity = 5;
-let tiltAxis = 'x'; // 'x' = gamma (left/right), 'y' = beta (front/back)
-let isRunning = false;
+const images = [];
+let stripCount = 24, blendWidth = 5, tiltAxis = 'x', isRunning = false;
+const COLORS = ['#7c6aef','#1d9e75','#d85a30','#d4537e','#378add','#ba7517','#639922','#a32d2d'];
 
-// ========== DOM ==========
-const file1 = document.getElementById('file1');
-const file2 = document.getElementById('file2');
-const box1 = document.getElementById('box1');
-const box2 = document.getElementById('box2');
-const stripSlider = document.getElementById('stripSlider');
-const sensSlider = document.getElementById('sensSlider');
+const imgList = document.getElementById('imgList');
+const addBtn = document.getElementById('addBtn');
+const fileInput = document.getElementById('fileInput');
+const anglePreview = document.getElementById('anglePreview');
+const angleBar = document.getElementById('angleBar');
 const startBtn = document.getElementById('startBtn');
 const canvasView = document.getElementById('canvasView');
 const mainCanvas = document.getElementById('mainCanvas');
 const ctx = mainCanvas.getContext('2d');
 const hudAngle = document.getElementById('hudAngle');
-const hudLabel = document.getElementById('hudLabel');
-const hudBar = document.getElementById('hudBar');
-const backBtn = document.getElementById('backBtn');
+const hudShowing = document.getElementById('hudShowing');
+const hudDot = document.getElementById('hudDot');
 
-// ========== Image Upload ==========
-function loadFile(file, callback) {
+addBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = (ev) => {
     const img = new Image();
-    img.onload = () => callback(img);
-    img.src = e.target.result;
+    img.onload = () => {
+      images.push({
+        img, src: ev.target.result,
+        name: file.name.length > 18 ? file.name.slice(0,16)+'...' : file.name,
+        fromAngle: 0, toAngle: 0
+      });
+      autoDistribute();
+      renderList();
+      updateUI();
+    };
+    img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
+  fileInput.value = '';
+});
+
+function removeImage(idx) {
+  images.splice(idx, 1);
+  autoDistribute();
+  renderList();
+  updateUI();
 }
 
-function showPreview(box, img) {
-  const old = box.querySelector('.preview');
-  if (old) old.remove();
-  const el = document.createElement('img');
-  el.className = 'preview';
-  el.src = img.src;
-  box.appendChild(el);
-  box.classList.add('has-image');
-  box.querySelector('.icon').style.display = 'none';
-  box.querySelector('.label').style.display = 'none';
-}
-
-function checkReady() {
-  if (imgA && imgB) {
-    startBtn.disabled = false;
-    startBtn.textContent = '开始体验 ✨';
-  }
-}
-
-file1.addEventListener('change', (e) => {
-  if (e.target.files[0]) {
-    loadFile(e.target.files[0], (img) => {
-      imgA = img;
-      showPreview(box1, img);
-      checkReady();
-    });
-  }
-});
-file2.addEventListener('change', (e) => {
-  if (e.target.files[0]) {
-    loadFile(e.target.files[0], (img) => {
-      imgB = img;
-      showPreview(box2, img);
-      checkReady();
-    });
-  }
-});
-
-// ========== Settings ==========
-stripSlider.addEventListener('input', () => {
-  stripCount = parseInt(stripSlider.value);
-  document.getElementById('stripValue').textContent = stripCount;
-});
-sensSlider.addEventListener('input', () => {
-  sensitivity = parseInt(sensSlider.value);
-  document.getElementById('sensValue').textContent = sensitivity;
-});
-
-function setAxis(axis) {
-  tiltAxis = axis;
-  document.querySelectorAll('.axis-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.axis === axis);
+function renderList() {
+  imgList.innerHTML = '';
+  images.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'img-item';
+    div.innerHTML =
+      `<img class="img-thumb" src="${item.src}">`+
+      `<div class="img-info">`+
+        `<div class="img-name" style="color:${COLORS[i%8]}">${i+1}. ${item.name}</div>`+
+        `<div class="angle-row">`+
+          `<span>从</span>`+
+          `<input class="angle-input" type="number" value="${item.fromAngle}" min="-90" max="90" onchange="updAngle(${i},'f',this.value)">`+
+          `<span>° 到</span>`+
+          `<input class="angle-input" type="number" value="${item.toAngle}" min="-90" max="90" onchange="updAngle(${i},'t',this.value)">`+
+          `<span>°</span>`+
+        `</div>`+
+      `</div>`+
+      `<button class="img-remove" onclick="removeImage(${i})">✕</button>`;
+    imgList.appendChild(div);
   });
-  hudLabel.textContent = axis === 'x' ? '左右倾斜手机切换图片' : '前后倾斜手机切换图片';
 }
 
-// ========== Canvas Rendering ==========
+function updAngle(idx, which, val) {
+  val = Math.max(-90, Math.min(90, parseInt(val)||0));
+  if (which==='f') images[idx].fromAngle = val;
+  else images[idx].toAngle = val;
+  renderAngleBar();
+}
+
+function autoDistribute() {
+  if (!images.length) return;
+  const span = 180 / images.length;
+  images.forEach((item, i) => {
+    item.fromAngle = Math.round(-90 + i * span);
+    item.toAngle = Math.round(-90 + (i+1) * span);
+  });
+  renderList();
+  renderAngleBar();
+}
+
+function renderAngleBar() {
+  angleBar.innerHTML = '';
+  if (!images.length) { anglePreview.style.display='none'; return; }
+  anglePreview.style.display = '';
+  const sorted = images.map((m,i)=>({...m,idx:i})).sort((a,b)=>a.fromAngle-b.fromAngle);
+  sorted.forEach(item => {
+    const span = Math.max(1, Math.abs(item.toAngle - item.fromAngle));
+    const seg = document.createElement('div');
+    seg.className = `angle-segment seg-${item.idx%8}`;
+    seg.style.flex = span;
+    seg.textContent = span >= 20 ? `${item.fromAngle}°~${item.toAngle}°` : '';
+    angleBar.appendChild(seg);
+  });
+}
+
+function updateUI() {
+  const ok = images.length >= 2;
+  startBtn.disabled = !ok;
+  startBtn.textContent = ok ? `开始体验 (${images.length}张图)` : `请至少上传2张图片 (已有${images.length}张)`;
+  renderAngleBar();
+}
+
+document.getElementById('stripSlider').addEventListener('input', function(){ stripCount=+this.value; document.getElementById('stripValue').textContent=stripCount; });
+document.getElementById('blendSlider').addEventListener('input', function(){ blendWidth=+this.value; document.getElementById('blendValue').textContent=blendWidth+'°'; });
+
+function setAxis(a) {
+  tiltAxis = a;
+  document.querySelectorAll('.axis-btn').forEach(b => b.classList.toggle('active', b.dataset.axis===a));
+}
+
+let scaledImages = [];
+
 function setupCanvas() {
-  const w = Math.max(imgA.naturalWidth, imgB.naturalWidth);
-  const h = Math.max(imgA.naturalHeight, imgB.naturalHeight);
-  const maxDim = 1080;
-  const scale = Math.min(1, maxDim / Math.max(w, h));
-  mainCanvas.width = Math.round(w * scale);
-  mainCanvas.height = Math.round(h * scale);
+  let mw=0, mh=0;
+  images.forEach(m => { mw=Math.max(mw,m.img.naturalWidth); mh=Math.max(mh,m.img.naturalHeight); });
+  const s = Math.min(1, 1080/Math.max(mw,mh));
+  mainCanvas.width = Math.round(mw*s);
+  mainCanvas.height = Math.round(mh*s);
+  scaledImages = images.map(m => {
+    const c = document.createElement('canvas');
+    c.width = mainCanvas.width; c.height = mainCanvas.height;
+    c.getContext('2d').drawImage(m.img, 0, 0, c.width, c.height);
+    return c;
+  });
 }
 
-// Offscreen canvases for pre-scaling images (performance)
-let scaledA = null, scaledB = null;
+function findImages(angle) {
+  const sorted = images.map((m,i)=>({from:m.fromAngle, to:m.toAngle, idx:i})).sort((a,b)=>a.from-b.from);
+  let pri = -1, sec = -1, t = 0;
 
-function prepareScaledImages() {
+  for (let i=0; i<sorted.length; i++) {
+    const s = sorted[i];
+    if (angle >= s.from && angle < s.to) {
+      pri = s.idx;
+      if (blendWidth > 0 && i < sorted.length-1) {
+        const d = s.to - angle;
+        if (d <= blendWidth) { sec = sorted[i+1].idx; t = 1 - d/blendWidth; }
+      }
+      if (blendWidth > 0 && i > 0 && sec===-1) {
+        const d = angle - s.from;
+        if (d <= blendWidth) { sec = sorted[i-1].idx; t = 1 - d/blendWidth; }
+      }
+      break;
+    }
+  }
+  if (pri===-1 && sorted.length) {
+    pri = angle < sorted[0].from ? sorted[0].idx : sorted[sorted.length-1].idx;
+  }
+  return { pri, sec, t };
+}
+
+function drawFrame(angle) {
   const W = mainCanvas.width, H = mainCanvas.height;
+  const { pri, sec, t } = findImages(angle);
 
-  scaledA = document.createElement('canvas');
-  scaledA.width = W; scaledA.height = H;
-  scaledA.getContext('2d').drawImage(imgA, 0, 0, W, H);
+  if (pri === -1) { ctx.clearRect(0,0,W,H); return; }
 
-  scaledB = document.createElement('canvas');
-  scaledB.width = W; scaledB.height = H;
-  scaledB.getContext('2d').drawImage(imgB, 0, 0, W, H);
-}
+  if (sec === -1 || t < 0.01) {
+    ctx.drawImage(scaledImages[pri], 0, 0);
+    hudShowing.textContent = images[pri].name;
+    hudShowing.style.color = COLORS[pri%8];
+    return;
+  }
 
-/**
- * 绘制光栅帧
- * 每个条纹就是一个"百叶窗叶片"，内部分成 A 和 B 两部分
- * t 控制每个叶片内 A 和 B 各占多少宽度
- * t=0: 全部显示 A
- * t=1: 全部显示 B
- * 所有条纹同步变化
- * @param {number} t - 混合因子 0..1
- */
-function drawFrame(t) {
-  const W = mainCanvas.width;
-  const H = mainCanvas.height;
   const stripW = W / stripCount;
+  ctx.clearRect(0,0,W,H);
 
-  t = Math.max(0, Math.min(1, t));
-
-  ctx.clearRect(0, 0, W, H);
-
-  for (let i = 0; i < stripCount; i++) {
-    const x = Math.round(i * stripW);
-    const nextX = Math.round((i + 1) * stripW);
-    const fullW = nextX - x;
-
-    // A 占的宽度从左边开始，B 占的宽度从右边开始
-    const aW = Math.round(fullW * (1 - t));
-    const bW = fullW - aW;
-
-    // 画 A 的部分（左侧）
-    if (aW > 0) {
-      ctx.drawImage(scaledA, x, 0, aW, H, x, 0, aW, H);
-    }
-
-    // 画 B 的部分（右侧）
-    if (bW > 0) {
-      const bx = x + aW;
-      ctx.drawImage(scaledB, bx, 0, bW, H, bx, 0, bW, H);
-    }
-
-    // 条纹分界线
-    ctx.fillStyle = 'rgba(0,0,0,0.15)';
-    ctx.fillRect(nextX - 1, 0, 1, H);
-  }
-}
-
-// ========== Sensor Handling ==========
-let currentT = 0.5;
-let smoothT = 0.5;
-let animFrame = null;
-
-function handleOrientation(e) {
-  if (!isRunning) return;
-
-  let angle;
-  if (tiltAxis === 'x') {
-    angle = e.gamma || 0; // -90..90 left/right
-  } else {
-    angle = (e.beta || 0) - 45; // recentered: holding phone ~45° is "neutral"
+  for (let i=0; i<stripCount; i++) {
+    const x = Math.round(i*stripW);
+    const nx = Math.round((i+1)*stripW);
+    const fw = nx - x;
+    const aW = Math.round(fw * (1-t));
+    const bW = fw - aW;
+    if (aW > 0) ctx.drawImage(scaledImages[pri], x, 0, aW, H, x, 0, aW, H);
+    if (bW > 0) ctx.drawImage(scaledImages[sec], x+aW, 0, bW, H, x+aW, 0, bW, H);
+    ctx.fillStyle = 'rgba(0,0,0,.1)';
+    ctx.fillRect(nx-1, 0, 1, H);
   }
 
-  const range = 90 / sensitivity;
-  currentT = Math.max(0, Math.min(1, (angle + range) / (2 * range)));
-
-  hudAngle.textContent = `${Math.round(angle)}°`;
-  hudBar.style.width = `${currentT * 100}%`;
+  hudShowing.textContent = `${images[pri].name} → ${images[sec].name}`;
+  hudShowing.style.color = COLORS[pri%8];
 }
 
-function renderLoop() {
+let curAngle = 0, smAngle = 0, af = null;
+
+function handleOri(e) {
   if (!isRunning) return;
-
-  // 平滑插值，避免抖动
-  smoothT += (currentT - smoothT) * 0.25;
-  drawFrame(smoothT);
-
-  animFrame = requestAnimationFrame(renderLoop);
+  curAngle = tiltAxis==='x' ? (e.gamma||0) : ((e.beta||0)-45);
+  curAngle = Math.max(-90, Math.min(90, curAngle));
 }
 
-// ========== Start / Stop ==========
-function startExperience() {
+function loop() {
+  if (!isRunning) return;
+  smAngle += (curAngle - smAngle) * 0.25;
+  drawFrame(smAngle);
+  hudAngle.textContent = Math.round(smAngle) + '°';
+  hudDot.style.left = `calc(${((smAngle+90)/180)*100}% - 4px)`;
+  af = requestAnimationFrame(loop);
+}
+
+async function start() {
   setupCanvas();
-  prepareScaledImages();
-  currentT = 0.5;
-  smoothT = 0.5;
-  drawFrame(0.5);
+  drawFrame(0);
   canvasView.classList.add('active');
   isRunning = true;
+  curAngle = 0; smAngle = 0;
 
-  window.addEventListener('deviceorientation', handleOrientation);
-  renderLoop();
+  if (typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function') {
+    try { const p = await DeviceOrientationEvent.requestPermission(); if(p==='granted') window.addEventListener('deviceorientation',handleOri); } catch(e){}
+  } else if (typeof DeviceOrientationEvent!=='undefined') {
+    window.addEventListener('deviceorientation', handleOri);
+  }
+  if (!('ontouchstart' in window)) {
+    window.addEventListener('mousemove', e => { if(isRunning) curAngle=((e.clientX/window.innerWidth)-.5)*180; });
+  }
+  loop();
 }
 
-function stopExperience() {
+function stop() {
   isRunning = false;
   canvasView.classList.remove('active');
-  window.removeEventListener('deviceorientation', handleOrientation);
-  if (animFrame) cancelAnimationFrame(animFrame);
+  window.removeEventListener('deviceorientation', handleOri);
+  if (af) cancelAnimationFrame(af);
 }
 
-startBtn.addEventListener('click', startExperience);
-backBtn.addEventListener('click', stopExperience);
+startBtn.addEventListener('click', start);
+document.getElementById('backBtn').addEventListener('click', stop);
 
-// Register PWA Service Worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
-}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script>
 </body>
 </html>
