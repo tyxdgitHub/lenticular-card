@@ -431,8 +431,8 @@ function drawFrame(angle) {
     ctx.globalAlpha = 1;
   } else {
     // ---- 光栅模式: 条纹切换 ----
-    // t 从 0(全主图) 到 0.5(各半) — fadeAlpha 就是 0~0.5 的值
-    const t = fadeAlpha * 2; // 映射到 0~1
+    // fadeAlpha 从 0(无过渡) 到 0.5(分割点各半叠加), 直接作为条纹比例
+    const t = fadeAlpha;
     ctx.drawImage(scaledImages[showIdx], 0, 0);
     const stripW = W / stripCount;
     ctx.save();
