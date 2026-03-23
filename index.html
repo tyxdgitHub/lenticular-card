@@ -472,14 +472,18 @@ function handleOri(e) {
   let raw;
   if (tiltAxis === 'x') {
     if (isLandscape) {
-      raw = screenAngle === 90 ? -(e.beta||0)+45 : (e.beta||0)-45;
+      // 横屏时，物理左右倾斜 = beta 变化，放平=0°
+      raw = screenAngle === 90 ? -(e.beta||0) : (e.beta||0);
     } else {
+      // 竖屏时，物理左右倾斜 = gamma 变化
       raw = e.gamma || 0;
     }
   } else {
     if (isLandscape) {
-      raw = e.gamma || 0;
+      // 横屏时，物理前后倾斜 = gamma 变化
+      raw = screenAngle === 90 ? (e.gamma||0) : -(e.gamma||0);
     } else {
+      // 竖屏时，物理前后倾斜 = beta 变化，减 45 是因为正常手持约 45°
       raw = (e.beta||0) - 45;
     }
   }
