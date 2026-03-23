@@ -492,7 +492,12 @@ function prepareScaledImages() {
 
 /**
  * 绘制光栅帧
- * @param {number} t - 混合因子 0..1 (0 = 全A, 1 = 全B)
+ * 每个条纹就是一个"百叶窗叶片"，内部分成 A 和 B 两部分
+ * t 控制每个叶片内 A 和 B 各占多少宽度
+ * t=0: 全部显示 A
+ * t=1: 全部显示 B
+ * 所有条纹同步变化
+ * @param {number} t - 混合因子 0..1
  */
 function drawFrame(t) {
   const W = mainCanvas.width;
@@ -503,25 +508,29 @@ function drawFrame(t) {
 
   ctx.clearRect(0, 0, W, H);
 
-  // 光栅效果：每个条纹根据 phase + t 决定显示哪张图
   for (let i = 0; i < stripCount; i++) {
     const x = Math.round(i * stripW);
     const nextX = Math.round((i + 1) * stripW);
-    const w = nextX - x;
+    const fullW = nextX - x;
 
-    // 使用正弦函数让条纹之间的切换更平滑，模拟真实光栅
-    const phase = i / stripCount;
-    const wave = Math.sin((phase + t) * Math.PI);
-    const showB = wave > 0.5;
+    // A 占的宽度从左边开始，B 占的宽度从右边开始
+    const aW = Math.round(fullW * (1 - t));
+    const bW = fullW - aW;
 
-    const src = showB ? scaledB : scaledA;
+    // 画 A 的部分（左侧）
+    if (aW > 0) {
+      ctx.drawImage(scaledA, x, 0, aW, H, x, 0, aW, H);
+    }
 
-    ctx.drawImage(src, x, 0, w, H, x, 0, w, H);
+    // 画 B 的部分（右侧）
+    if (bW > 0) {
+      const bx = x + aW;
+      ctx.drawImage(scaledB, bx, 0, bW, H, bx, 0, bW, H);
+    }
 
-    // 条纹边界的微妙阴影，模拟光栅的物理凹槽
-    const edgeDark = 0.03 + 0.12 * (1 - Math.abs(wave - 0.5) * 2);
-    ctx.fillStyle = `rgba(0,0,0,${edgeDark})`;
-    ctx.fillRect(x, 0, 1, H);
+    // 条纹分界线
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.fillRect(nextX - 1, 0, 1, H);
   }
 }
 
